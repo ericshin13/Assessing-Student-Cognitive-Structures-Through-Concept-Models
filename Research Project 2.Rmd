@@ -1,0 +1,239 @@
+---
+title: "Research Project 2"
+author: "Eric Shin"
+date: '2023-01-30'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library('lme4')
+library('nlme')
+library('ggplot2')
+library('dplyr')
+library('tidyverse')
+library('googledrive')
+library('readxl')
+library('tidytext')
+library('wordcloud')
+library('syuzhet')
+```
+
+# Purpose of the R Markdown Document
+The purpose of this R Markdown document is to create linear models using the cleaned up University of Washington Bothell data set. The data set has transcribed student models of Statistics concepts that contain extracted variables which correspond to different categories such as courses, instructors, years, semesters, question concepts, as well as question contexts. The data set also has network analysis measures that tell us how big the student made models are based on more concepts that have been added to the updated model in comparison to the beginning models. Using the data set, the linear models that we create will help us understand how certain extracted variables predict certain results of the student models. The growth and changes of the linear models will also show us evidence of student learning through their understanding of Statistics concepts.
+
+Research Question: What factors best explain the changes in the student-made models about statistics as representations of their cognitive structure?
+
+```{r loading data}
+#drive_download("https://docs.google.com/spreadsheets/d/1WtLmhMSbdFgLVCkM3Hgt0lcLci_WBy52V5FdciImsos/edit#gid=2079150870")
+
+uw_concepts <- read_excel("big_uw_data.xlsx") %>%
+  filter(elem. == "concept", Course %in% c("BIS315","BIS215"))
+
+# write.csv(uw_concepts,"uw_concepts.csv")
+
+uw_concepts <- read.csv("uw_concepts.csv") %>%
+  unclass() %>%
+  as.data.frame(stringsAsFactors=TRUE) %>%
+  filter(attr. == "label")
+
+Network_Results <- read.csv("networkresults.csv")
+Network_Results$StudentID <- as.factor(Network_Results$StudentID)
+#%>% select() %>% mutate( = as.factor())
+
+```
+
+```{r linear model 1}
+
+#Number of Concepts are predicted by the two quarters along with the concept models at three assessment points
+
+#CM1, CM2, and CM3 are assigned as variables under the Course category by mistake (Supposed to be assigned as variables under the ExamType category)
+
+NetworkResults_Lm = lm(n_nodes ~ AcademicTerm + Course, data = Network_Results)
+
+#Number of Concepts are predicted by the interactions between the AcademicTerm and Course variables
+
+NetworkResults_Lm2 = lm(n_nodes ~ 1 + AcademicTerm:Course , data = Network_Results)
+
+#Residual Plots
+
+plot(NetworkResults_Lm, pch = 16, col = "green")
+
+#Box and Whisker Plot that shows how the two different quarters have an influence on the number of concepts being added to the models
+
+ggplot(data = Network_Results, aes(x = AcademicTerm, y = n_nodes, fill = Course)) + geom_boxplot() + geom_jitter() + facet_wrap(~Course)
+
+#Box and Whisker Plot that shows the probability density of the concept models at different values of nodes (Nodes = Concepts)
+
+ggplot(data = Network_Results, aes(x = AcademicTerm, y = n_nodes, fill = Course)) + geom_violin() + geom_jitter() + facet_wrap(~Course)
+
+#Histogram that shows the frequency distributions across the different values of nodes for the concept models
+
+ggplot(data = Network_Results, aes(x = n_nodes, fill = Course)) + geom_histogram(bins = 15) + facet_wrap(~Course)
+
+anova(NetworkResults_Lm)
+
+summary(NetworkResults_Lm)
+
+```
+
+```{r concepts 1} 
+
+uw_concepts %>% mutate(value. = str_to_lower(value.)) %>% group_by(ExamType, value.) %>% 
+  summarise(n = n()) %>% filter(n>1)
+
+uw_concepts %>% mutate(value. = str_to_lower(value.)) %>% group_by(ExamType, value.) %>% 
+  summarise(n = n()) %>%
+  pivot_wider(names_from = ExamType, values_from = n)
+
+words <- uw_concepts %>%
+  mutate(text = value.,
+         text = str_remove_all(text, "&amp;|&lt;|&gt;"),
+         text = str_remove_all(text, "\\s?(f|ht)(tp)(s?)(://)([^\\.]*)[\\.|/](\\S*)"),
+         text = str_remove_all(text, "[^\x01-\x7F]")) %>% 
+  unnest_tokens(word, text) %>%
+  filter(!word %in% stop_words$word,
+         !word %in% str_remove_all(stop_words$word, "'"),
+         str_detect(word, "[a-z]"),
+         !str_detect(word, "^#"),         
+         !str_detect(word, "@\\S+")) %>%
+  group_by(ExamType, word) %>% 
+  summarise(n = n()) %>% 
+  pivot_wider(names_from = ExamType, values_from = n) %>% replace(is.na(.), 0) %>%
+  filter(CM1+CM2+CM3 > 4)
+
+words %>% 
+  with(wordcloud(word, CM1, random.order = FALSE, max.words = 100, colors = "#F8766D"))
+
+words %>% 
+  with(wordcloud(word, CM2, random.order = FALSE, max.words = 100, colors = "#00BA38"))
+
+words %>% 
+  with(wordcloud(word, CM3, random.order = FALSE, max.words = 100, colors = "#619CFF"))
+
+
+```
+
+```{r concepts 2} 
+
+uw_concepts %>% mutate(value. = str_to_lower(value.)) %>% group_by(Course, value.) %>% 
+  summarise(n = n()) %>% filter(n>1)
+
+uw_concepts %>% mutate(value. = str_to_lower(value.)) %>% group_by(Course, value.) %>% 
+  summarise(n = n()) %>%
+  pivot_wider(names_from = Course, values_from = n)
+
+words <- uw_concepts %>%
+  mutate(text = value.,
+         text = str_remove_all(text, "&amp;|&lt;|&gt;"),
+         text = str_remove_all(text, "\\s?(f|ht)(tp)(s?)(://)([^\\.]*)[\\.|/](\\S*)"),
+         text = str_remove_all(text, "[^\x01-\x7F]")) %>% 
+  unnest_tokens(word, text) %>%
+  filter(!word %in% stop_words$word,
+         !word %in% str_remove_all(stop_words$word, "'"),
+         str_detect(word, "[a-z]"),
+         !str_detect(word, "^#"),         
+         !str_detect(word, "@\\S+")) %>%
+  group_by(Course, word) %>% 
+  summarise(n = n()) %>% 
+  pivot_wider(names_from = Course, values_from = n) %>% replace(is.na(.), 0) %>%
+  filter(BIS215 + BIS315 > 4)
+
+words %>% 
+  with(wordcloud(word, BIS215, random.order = FALSE, max.words = 100, colors = "#F8766D"))
+
+words %>% 
+  with(wordcloud(word, BIS315, random.order = FALSE, max.words = 100, colors = "#00BA38"))
+
+```
+
+```{r linear model 1 with interactions}
+NetworkResults_Lmst = lm(n_nodes~ StudentID + AcademicTerm + Course, data = Network_Results)
+NetworkResults_Lmi = lm(n_nodes~ StudentID + AcademicTerm:Course
+                        , data = Network_Results )
+NetworkResults_Lmist = lm(n_nodes~ StudentID+ AcademicTerm:Course
+                        , data = Network_Results )
+NetworkResults_Lmer <- lmer(n_nodes ~ Course + AcademicTerm + AcademicTerm:Course + StudentID +(1 | StudentID:AcademicTerm), data = Network_Results)
+
+NetworkResults_Lmer <- lmer(n_nodes ~ StudentID + AcademicTerm + Course  + (1 | StudentID:AcademicTerm), data = Network_Results)
+
+anova(NetworkResults_Lm,NetworkResults_Lmi,NetworkResults_Lmist)
+summary(NetworkResults_Lmi)
+summary(NetworkResults_Lm)
+summary(NetworkResults_Lmer)
+Network_Results <- Network_Results %>% 
+  mutate(fixedprediction = predict(NetworkResults_Lmer)) #generate predicted outcome (y-hat)
+
+ggplot(data = Network_Results, aes(x = Course, y = n_nodes, color = StudentID, group = StudentID)) +
+  geom_point() +
+  geom_line(aes(y = fixedprediction)) +
+  facet_wrap(~AcademicTerm)+
+  theme(legend.position = "none")
+```
+
+```{r pivot to model}
+
+Network_Results <- read.csv("networkresults.csv")  %>% filter(Course != "CM2")
+Network_Results$StudentID <- as.factor(Network_Results$StudentID)
+
+Network_pivot = Network_Results %>% 
+  select(StudentID, AcademicTerm,Course,n_nodes) %>%
+  pivot_wider(names_from = Course, values_from = n_nodes, values_fn = max) %>%
+  mutate(diff = as.numeric(CM3) - as.numeric(CM1)) %>%
+  na.omit()
+
+NetworkLm_pivot = lm(diff ~ AcademicTerm  + CM1, data = Network_pivot)
+
+NetworkLm_pivot2 = lm(diff ~ AcademicTerm:CM1, data = Network_pivot)
+
+NetworkLm_pivot3 = lm(diff ~ AcademicTerm + CM1 + AcademicTerm:CM1, data = Network_pivot)
+
+NetworkLm_pivot4 = lm(diff ~ StudentID + AcademicTerm + CM1 + AcademicTerm:CM1, data = Network_pivot)
+
+
+Network_pivot <- Network_pivot %>% 
+  mutate(fixedprediction = predict(NetworkLm_pivot3)) #generate predicted outcome (y-hat)
+
+ggplot(data = Network_pivot, aes(x = CM1, y = diff, color = AcademicTerm)) +
+  geom_point(shape = 10) +
+  geom_point(aes(y = fixedprediction)) +
+  geom_smooth(method = "lm") + 
+  theme(legend.position = "none") + facet_wrap(~AcademicTerm)
+
+anova(NetworkLm_pivot, NetworkLm_pivot2, NetworkLm_pivot3, NetworkLm_pivot4)
+
+summary(NetworkLm_pivot2)
+```
+
+```{r pivot to model 2}
+
+Network_pivot = Network_Results %>% 
+  select(StudentID, AcademicTerm,Course,n_nodes) %>%
+  pivot_wider(names_from = Course, values_from = n_nodes, values_fn = max) %>%
+  mutate(diff = as.numeric(CM3) - as.numeric(CM1)) %>%
+  na.omit()
+
+NetworkLm_pivot = lm(CM3 ~ AcademicTerm  + CM1, data = Network_pivot)
+
+NetworkLm_pivot2 = lm(CM3 ~ AcademicTerm:CM1, data = Network_pivot)
+
+NetworkLm_pivot3 = lm(CM3 ~ AcademicTerm + CM1 + AcademicTerm:CM1, data = Network_pivot)
+
+NetworkLm_pivot4 = lm(CM3 ~ StudentID + AcademicTerm + CM1 + AcademicTerm:CM1, data = Network_pivot)
+
+
+Network_pivot <- Network_pivot %>% 
+  mutate(fixedprediction = predict(NetworkLm_pivot3)) #generate predicted outcome (y-hat)
+
+ggplot(data = Network_pivot, aes(x = CM1, y = CM3, color = AcademicTerm)) +
+  geom_point(shape = 10) +
+  geom_point(aes(y = fixedprediction)) +
+  geom_smooth(method = "lm") + 
+  theme(legend.position = "none") + facet_wrap(~AcademicTerm)
+
+anova(NetworkLm_pivot, NetworkLm_pivot2, NetworkLm_pivot3, NetworkLm_pivot4)
+
+summary(NetworkLm_pivot2)
+
+```
+
