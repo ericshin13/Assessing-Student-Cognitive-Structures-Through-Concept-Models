@@ -1,0 +1,360 @@
+---
+title: "Research Project 2"
+author: "Eric Shin"
+date: '2023-01-30'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library('lme4')
+library('nlme')
+library('ggplot2')
+library('dplyr')
+library('tidyverse')
+library('googledrive')
+library('readxl')
+library('tidytext')
+library('wordcloud')
+library('syuzhet')
+library('ggpubr')
+```
+
+# Purpose of the R Markdown Document
+The purpose of this R Markdown document is to create linear models using the cleaned up University of Washington Bothell data set. The data set has transcribed student models of Statistics concepts that contain extracted variables which correspond to different categories such as courses, instructors, years, semesters, question concepts, as well as question contexts. The data set also has network analysis measures that tell us how big the student made models are based on more concepts that have been added to the updated model in comparison to the beginning models. Using the data set, the linear models that we create will help us understand how certain extracted variables predict certain results of the student models. The growth and changes of the linear models will also show us evidence of student learning through their understanding of Statistics concepts.
+
+Research Question: What factors best explain the changes in the student-made models about statistics as representations of their cognitive structure?
+
+```{r loading data}
+#load("SMALS.Rdata")
+uw_concepts <- read_csv2("big_uw_data.csv") 
+uw_concepts <- uw_concepts%>%
+  filter(elem. == "concept", Course %in% c("BIS315","BIS215"))
+
+write.csv(uw_concepts,"uw_concepts.csv")
+
+uw_concepts <- read.csv("uw_concepts.csv") %>%
+  unclass() %>%
+  as.data.frame(stringsAsFactors=TRUE) %>%
+  filter(attr. == "label")
+
+Network_Results <- read.csv("networkresults.csv") %>%
+  unique() %>%
+  mutate(Course = as.numeric(str_remove(Course, "CM")))
+
+Network_Results$StudentID <- as.factor(Network_Results$StudentID)
+
+#setwd("C:/Users/erics/Documents/Eric Workspace/SMALS/Student Projects/2023 Winter/Eric Shin")
+
+```
+
+```{r linear model n_nodes}
+
+#Number of Concepts are predicted by the two different quarters at three assessment points
+
+#CM1, CM2, and CM3 are assigned as variables under the Course category by mistake (Supposed to be assigned as variables under the ExamType category)
+
+NetworkResults_Lm1 = lm(n_nodes ~ AcademicTerm + Course, data = Network_Results)
+
+#Residual Plot
+
+ggqqplot(residuals(NetworkResults_Lm1), col = "forestgreen") +
+  stat_qq(col = "forestgreen") +
+  stat_qq_line() + labs(x = "Theoretical Quantiles", y = "Standardized Residuals") + theme(panel.background = element_rect(fill = "lightgray")) + ggtitle("Distribution of the Concepts") + theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
+
+#Box and Whisker Plot that shows how the two different quarters have an influence on the number of concepts being added to the models
+
+ggplot(data = Network_Results, aes(x = AcademicTerm, y = n_nodes, fill = Course)) + geom_boxplot() + geom_jitter() + facet_wrap(~Course) + ggtitle("Students added concepts to their models at a significantly slower rate") + theme(plot.title = element_text(hjust = 0.5, size = 15, face = "bold"), axis.title.x = element_blank(), axis.title.y = element_blank(), legend.position = "none") + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+#Anova Table and Summary Table
+
+anova(NetworkResults_Lm1)
+
+summary(NetworkResults_Lm1)
+
+
+```
+
+```{r linear model n_edges}
+
+#Number of Connections between Concepts are predicted by the two different quarters at three assessment points
+
+NetworkResults_Lm2 = lm(n_edges ~ AcademicTerm + Course, data = Network_Results)
+
+#Residual Plot
+
+ggqqplot(residuals(NetworkResults_Lm2), col = "forestgreen") +
+  stat_qq(col = "forestgreen") + 
+  stat_qq_line() + labs(x = "Theoretical Quantiles", y = "Standardized Residuals") + 
+  theme(panel.background = element_rect(fill = "lightgray")) + ggtitle("Distribution of the Concept Connections") + theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
+
+#Box and Whisker Plot that shows how the two different quarters have an influence on the number of connections between concepts
+
+ggplot(data = Network_Results, aes(x = AcademicTerm, y = n_edges, fill = Course)) + geom_boxplot() + geom_jitter() + facet_wrap(~Course) + ggtitle("") + theme(plot.title = element_text(hjust = 0.5, size = 15, face = "bold"), axis.title.x = element_blank(), axis.title.y = element_blank(), legend.position = "none") + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+#Anova Table and Summary Table
+
+anova(NetworkResults_Lm2)
+
+summary(NetworkResults_Lm2)
+
+```
+
+```{r linear model n_edges}
+
+#Number of Connections between Concepts are predicted by the two different quarters at three assessment points
+
+NetworkResults_Lm3 = lm(n_edges ~ AcademicTerm + Course + AcademicTerm:Course, data = Network_Results)
+
+#Residual Plot
+
+ggqqplot(residuals(NetworkResults_Lm3), col = "forestgreen") +
+  stat_qq(col = "forestgreen") + 
+  stat_qq_line() + labs(x = "Theoretical Quantiles", y = "Standardized Residuals") + 
+  theme(panel.background = element_rect(fill = "lightgray")) + ggtitle("Distribution of the Concept Connections") + theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
+
+#Box and Whisker Plot that shows how the two different quarters have an influence on the number of connections between concepts
+
+ggplot(data = Network_Results, aes(x = AcademicTerm, y = n_edges, fill = Course)) + geom_boxplot() + geom_jitter() + facet_wrap(~Course) + ggtitle("") + theme(plot.title = element_text(hjust = 0.5, size = 15, face = "bold"), axis.title.x = element_blank(), axis.title.y = element_blank(), legend.position = "none") + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+#Anova Table and Summary Table
+
+anova(NetworkResults_Lm3)
+
+summary(NetworkResults_Lm3)
+
+```
+
+```{r linear model edge_density}
+
+#Density of Connections between Concepts are predicted by the two different quarters at three assessment points
+
+NetworkResults_Lm4 = lm(edge_density ~ AcademicTerm + Course, data = Network_Results)
+
+#Residual Plot
+
+ggqqplot(residuals(NetworkResults_Lm4), col = "forestgreen") +
+  stat_qq(col = "forestgreen") + 
+  stat_qq_line() + labs(x = "Theoretical Quantiles", y = "Standardized Residuals") + 
+  theme(panel.background = element_rect(fill = "lightgray")) + ggtitle("Distribution of the Connection Density") + theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
+
+#Box and Whisker Plot that shows how the two different quarters have an influence on the density of connections between concepts
+
+ggplot(data = Network_Results, aes(x = AcademicTerm, y = edge_density, fill = Course)) + geom_boxplot() + geom_jitter() + facet_wrap(~Course) + ggtitle("") + theme(plot.title = element_text(hjust = 0.5, size = 15, face = "bold"), axis.title.x = element_blank(), axis.title.y = element_blank(), legend.position = "none") + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+#Anova Table and Summary Table
+
+anova(NetworkResults_Lm4)
+
+summary(NetworkResults_Lm4)
+
+#Additional ggplot graph
+
+ggplot(data = Network_Results, aes(x = n_nodes, y = edge_density, color = Course)) + geom_point() + facet_wrap(~AcademicTerm) + ggtitle("") + theme(plot.title = element_text(hjust = 0.5, size = 15, face = "bold"), axis.title.x = element_blank(), axis.title.y = element_blank(), legend.position = "none") + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+
+```
+
+
+```{r linear model avg_degree}
+
+#Average Degree is predicted by the two different quarters at three assessment points
+
+NetworkResults_Lm5 = lm(avg_degree ~ AcademicTerm + Course, data = Network_Results)
+
+#Residual Plot
+
+ggqqplot(residuals(NetworkResults_Lm5), col = "forestgreen") +
+  stat_qq(col = "forestgreen") + 
+  stat_qq_line() + labs(x = "Theoretical Quantiles", y = "Standardized Residuals") + 
+  theme(panel.background = element_rect(fill = "lightgray")) + ggtitle("Distribution of the Average Degree") + theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
+
+#Box and Whisker Plot that shows how the two different quarters have an influence on the average degree
+
+ggplot(data = Network_Results, aes(x = AcademicTerm, y = avg_degree, fill = Course)) + geom_boxplot() + geom_jitter() + facet_wrap(~Course) + ggtitle("") + theme(plot.title = element_text(hjust = 0.5, size = 15, face = "bold"), axis.title.x = element_blank(), axis.title.y = element_blank(), legend.position = "none") + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+#Anova Table and Summary Table
+
+anova(NetworkResults_Lm5)
+
+summary(NetworkResults_Lm5)
+
+
+```
+
+```{r linear model diameter}
+
+#Diameter is predicted by the two different quarters at three assessment points
+
+NetworkResults_Lm6 = lm(diameter ~ AcademicTerm + Course, data = Network_Results)
+
+#Residual Plot
+
+ggqqplot(residuals(NetworkResults_Lm6), col = "forestgreen") +
+  stat_qq(col = "forestgreen") + 
+  stat_qq_line() + labs(x = "Theoretical Quantiles", y = "Standardized Residuals") + 
+  theme(panel.background = element_rect(fill = "lightgray")) + ggtitle("Distribution of the Diameter") + theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
+
+#Box and Whisker Plot that shows how the two different quarters have an influence on the diameter
+
+ggplot(data = Network_Results, aes(x = AcademicTerm, y = diameter, fill = Course)) + geom_boxplot() + geom_jitter() + facet_wrap(~Course) + ggtitle("") + theme(plot.title = element_text(hjust = 0.5, size = 15, face = "bold"), axis.title.x = element_blank(), axis.title.y = element_blank(), legend.position = "none") + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+#Anova Table and Summary Table
+
+anova(NetworkResults_Lm6)
+
+summary(NetworkResults_Lm6)
+
+
+```
+
+```{r linear model centrality}
+
+#Centrality is predicted by the two different quarters at three assessment points
+
+NetworkResults_Lm7 = lm(centrality ~ AcademicTerm + Course, data = Network_Results)
+
+#Residual Plot
+
+ggqqplot(residuals(NetworkResults_Lm7), col = "forestgreen") +
+  stat_qq(col = "forestgreen") + 
+  stat_qq_line() + labs(x = "Theoretical Quantiles", y = "Standardized Residuals") + 
+  theme(panel.background = element_rect(fill = "lightgray")) + ggtitle("Distribution of the Centrality") + theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
+
+#Box and Whisker Plot that shows how the two different quarters have an influence on the centrality
+
+ggplot(data = Network_Results, aes(x = AcademicTerm, y = centrality, fill = Course)) + geom_boxplot() + geom_jitter() + facet_wrap(~Course) + ggtitle("") + theme(plot.title = element_text(hjust = 0.5, size = 15, face = "bold"), axis.title.x = element_blank(), axis.title.y = element_blank(), legend.position = "none") + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+#Anova Table and Summary Table
+
+anova(NetworkResults_Lm7)
+
+summary(NetworkResults_Lm7)
+
+
+```
+
+```{r linear model compactness}
+
+#Compactness is predicted by the two different quarters at three assessment points
+
+NetworkResults_Lm8 = lm(compactness ~ AcademicTerm + Course, data = Network_Results)
+
+#Residual Plot
+
+ggqqplot(residuals(NetworkResults_Lm8), col = "forestgreen") +
+  stat_qq(col = "forestgreen") + 
+  stat_qq_line() + labs(x = "Theoretical Quantiles", y = "Standardized Residuals") + 
+  theme(panel.background = element_rect(fill = "lightgray")) + ggtitle("Distribution of the Compactness") + theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
+
+#Box and Whisker Plot that shows how the two different quarters have an influence on the compactness
+
+ggplot(data = Network_Results, aes(x = AcademicTerm, y = compactness, fill = Course)) + geom_boxplot() + geom_jitter() + facet_wrap(~Course) + ggtitle("") + theme(plot.title = element_text(hjust = 0.5, size = 15, face = "bold"), axis.title.x = element_blank(), axis.title.y = element_blank(), legend.position = "none") + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+#Anova Table and Summary Table
+
+anova(NetworkResults_Lm8)
+
+summary(NetworkResults_Lm8)
+
+
+```
+
+```{r linear model transitivity}
+
+#Transitivity is predicted by the two different quarters at three assessment points
+
+NetworkResults_Lm9 = lm(transitivity ~ AcademicTerm + Course, data = Network_Results)
+
+#Residual Plot
+
+ggqqplot(residuals(NetworkResults_Lm9), col = "forestgreen") +
+  stat_qq(col = "forestgreen") + 
+  stat_qq_line() + labs(x = "Theoretical Quantiles", y = "Standardized Residuals") + 
+  theme(panel.background = element_rect(fill = "lightgray")) + ggtitle("Distribution of the Transitivity") + theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
+
+#Box and Whisker Plot that shows how the two different quarters have an influence on the transitivity
+
+ggplot(data = Network_Results, aes(x = AcademicTerm, y = transitivity, fill = Course)) + geom_boxplot() + geom_jitter() + facet_wrap(~Course) + ggtitle("") + theme(plot.title = element_text(hjust = 0.5, size = 15, face = "bold"), axis.title.x = element_blank(), axis.title.y = element_blank(), legend.position = "none") + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+#Anova Table and Summary Table
+
+anova(NetworkResults_Lm9)
+
+summary(NetworkResults_Lm9)
+
+
+```
+
+```{r linear model mean_betweenness}
+
+#Mean Betweenness is predicted by the two different quarters at three assessment points
+
+NetworkResults_Lm10 = lm(mean_betweenness ~ AcademicTerm + Course, data = Network_Results)
+
+#Residual Plot
+
+ggqqplot(residuals(NetworkResults_Lm10), col = "forestgreen") +
+  stat_qq(col = "forestgreen") + 
+  stat_qq_line() + labs(x = "Theoretical Quantiles", y = "Standardized Residuals") + 
+  theme(panel.background = element_rect(fill = "lightgray")) + ggtitle("Distribution of the Mean Betweenness") + theme(plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))
+
+#Box and Whisker Plot that shows how the two different quarters have an influence on the transitivity
+
+ggplot(data = Network_Results, aes(x = AcademicTerm, y = mean_betweenness, fill = Course)) + geom_boxplot() + geom_jitter() + facet_wrap(~Course) + ggtitle("") + theme(plot.title = element_text(hjust = 0.5, size = 15, face = "bold"), axis.title.x = element_blank(), axis.title.y = element_blank(), legend.position = "none") + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+#Anova Table and Summary Table
+
+anova(NetworkResults_Lm10)
+
+summary(NetworkResults_Lm10)
+
+
+```
+
+```{r linear model purrr}
+
+Linear_Models <- c("n_nodes ~ AcademicTerm + Course", "n_edges ~ AcademicTerm + Course", "edge_density ~ AcademicTerm + Course", "avg_degree ~ AcademicTerm + Course", "diameter ~ AcademicTerm + Course", "centrality ~ AcademicTerm + Course", "compactness ~ AcademicTerm + Course", "transitivity ~ AcademicTerm + Course", "mean_betweenness ~ AcademicTerm + Course")
+
+map(Linear_Models, ~lm(.x, data = Network_Results))
+
+map(Linear_Models, ~summary(lm(.x, data = Network_Results)))
+
+#summary(Lm_output)
+#anova(Lm_output)
+
+```
+
+```{r linear model 1 with interactions}
+NetworkResults_Lmst = lm(n_nodes~ StudentID + AcademicTerm + Course, data = Network_Results)
+NetworkResults_Lmi = lm(n_nodes~ StudentID + AcademicTerm:Course
+                        , data = Network_Results)
+NetworkResults_Lmist = lm(n_nodes~ StudentID:Course + AcademicTerm
+                        , data = Network_Results)
+NetworkResults_Lmer <- lmer(n_nodes ~ Course + AcademicTerm + AcademicTerm:Course + StudentID +(1 | StudentID:AcademicTerm), data = Network_Results)
+
+NetworkResults_Lmer <- lmer(n_nodes ~ StudentID + AcademicTerm + Course  + (1 | StudentID:AcademicTerm), data = Network_Results)
+
+anova(NetworkResults_Lm)
+anova(NetworkResults_Lmi)
+anova(NetworkResults_Lmist)
+anova(NetworkResults_Lmst)
+summary(NetworkResults_Lmi)
+summary(NetworkResults_Lm)
+summary(NetworkResults_Lmer)
+summary(NetworkResults_Lmst)
+Network_Results <- Network_Results %>% 
+  mutate(lmer = predict(NetworkResults_Lmer),
+         lmi = predict(NetworkResults_Lmi),
+         lmst = predict(NetworkResults_Lmst)) #generate predicted outcome (y-hat)
+
+ggplot(data = Network_Results, aes(x = Course, y = n_nodes, color = StudentID, group = StudentID)) +
+  geom_point() +
+  geom_line(aes(y = lmer), color = "black") +
+  geom_line(aes(y = lmi), color = "green") +
+  geom_line(aes(y = lmst), color = "blue") +
+  facet_wrap(~AcademicTerm)+
+  theme(legend.position = "none")
+
+```
+
