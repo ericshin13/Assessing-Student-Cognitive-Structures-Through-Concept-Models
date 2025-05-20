@@ -3,4 +3,4 @@ Students in a statistics course made concept models throughout the course. Previ
 ![SMALS-Eric-Shin-ResearchPoster-Image pptx](https://github.com/user-attachments/assets/ab4ffa1a-a51d-482b-9e99-0ad220181402)
 ## Technology Used: R Programming Language, Google Slides, Google Docs
 ## Project Code is located in the Rmd file
-## Research Findings are located in both the pptx and docx files
+## Research Findings are located in both the pptx and docx files (Download raw files)
